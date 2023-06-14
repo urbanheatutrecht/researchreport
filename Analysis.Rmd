@@ -1,0 +1,158 @@
+---
+title: 'The Influence of Urban Heat Island on Plant Diversity: A Case Study in Utrecht'
+subtitle: 'Research report'
+author: "Maartje van Bommel, Merit de Jong, Zoë Klein, Jeroen Mieras and Mees Torn"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+<br>
+
+### Introduction
+
+The Urban Heat Island (UHI) refers to the phenomenon where urban areas experience higher temperatures compared to their surrounding rural areas. This effect is primarily caused by the built environment of cities, which absorbs and retains more heat, as well as the greater presence of human heat sources such as cars and air conditioners (Rizwan et al., 2008). In the city of Utrecht, the UHI is evident through a temperature gradient, where the highest temperatures are observed in the city centre, gradually decreasing towards the rural areas (Brandsma & Wolters, 2012). 
+
+Elevated temperatures resulting from the UHI can have an impact on plant communities. Increased temperatures can increase the abiotic stress plants experience, resulting in an alteration between competition and facilitation dynamics within plant communities (Olsen et al., 2016). Consequently, the interactions between dominant and subordinate plant species may shift from facilitative to competitive. Subordinates may experience reduced survival due to this increased competition. These dynamics can ultimately lead to a reduction in plant diversity (Olsen et al., 2016). Given that the UHI phenomenon raises local temperatures, a negative effect of the UHI on plant diversity can be expected.  
+
+In our research, we investigated this impact in the city of Utrecht by examining road verges in different parts of the city. We assessed the plant species richness in flower-rich hay meadows of different UHI. Our hypothesis is that plant diversity declines with increasing intensity of the UHI. We expect sites with higher UHI to have less plant diversity than sites with lower UHI.
+
+### Methods
+
+We collected data in plots of flower-rich hay meadows located in different areas of Utrecht, ranging from the city centre to the eastern regions and near Utrecht Science Park. All of the sites were roadside verges that are managed by the municipality. Our selection of the specific sites was based on the mowing policy implemented by the Gemeente Utrecht (Maaikaart, 2023). We  specifically used meadows classified as *Bloemrijk hooiland 1x maaien (GR3+G12)*, as they represent fairly natural and accessible grasslands. By choosing sites with similar grassland types and mowing policy, we aim to eliminate any potential confounding variables associated with variations in grassland type or mowing frequency. To increase our statistical reliability, we  selected 12 different sites for replication purposes. Figure 1 shows the location of the plots trough Utrecht.
+
+<br>
+
+![Figure 1: Plot locations in the city of Utrecht. The locations are numbered to ensure that single data points can be traced back to individual plots.](Plotlocaties.png){width=75%}
+
+<br>
+
+The number of plant species were determined using morphological differences. Specifically, we visually identified and counted the number of species present within a 1x1 meter plot at each site. To reduce biases, the plots within each site were carefully selected to be representative of the overall plant diversity at the site.
+For each plot, we determined the intensity of the UHI at that location. For this, we used the report of Brandsma and Wolters (2012) on the UHI effect in Utrecht. This report contains a figure of the modelled UHI effect in the city and its surroundings (Figure 1). Using the colour scale, we assessed the UHI for each site.
+<br>
+
+![Figure 2: Spatial distribution of the mean night-time UHI intensity relative to the background temperature of the surrounding rural areas. The black curve represents the transect along which the measurements were taken. Retrieved from Brandsma & Wolters (2012).](Warmtekaart.jpg){width=75%}
+
+<br>
+
+### Results - statistical analysis
+
+<br>
+
+#### The data set
+
+##### Data import
+
+The data is given in the file "Data UHI". We import it into a data frame which we call "Data".
+```{r}
+Data <- read.csv("Data UHI.csv",  sep=";")
+Data
+```
+
+We examine the structure of the data set.
+```{r}
+str(Data)
+```
+
+The data set contains three vectors: "Plot" specifies the plot number; "UHI", specifies the intensity of the urban heat island and "Diversiteit", contains count data of the total number of plant species of each plot.
+
+We calculate some descriptive statistics.
+```{r}
+summary(Data)
+sd(Data$Diversiteit) ## Standard deviation of Diversiteit
+```
+
+We can also summarize these statistics in a boxplot:
+```{r fig.width=5, message=FALSE, warning=FALSE}
+library(ggplot2)  ## Load package which contains the function ggplot
+
+ggplot(Data, aes(factor(0), Diversiteit)) +
+  geom_boxplot(width = 0.4) +
+  geom_jitter(width = 0.08) +  ## Add jittered data points
+  labs(title = "Plant diversity",
+       y = expression("Amount of plant species" ~ ("m"^-2)),
+       x = "") + 
+   theme_bw() +
+  scale_x_discrete(breaks = seq(0, 2, by = 0.2),
+                     labels = function(x) ifelse(x == 0, "", x)) +
+  scale_y_continuous(breaks = seq(6, 19, by = 2),
+                     labels = seq(6, 19, by = 2))
+```
+
+
+##### Data visualization
+
+We now plot Diversiteit along UHI.
+```{r message=FALSE, warning=FALSE}
+ggplot(Data, aes(x = UHI, y = Diversiteit)) +
+  geom_point() +
+  labs(title = "Plant diversity along UHI",
+       y = expression("Amount of plant species" ~ ("m"^-2)),
+       x = "Urban Heat Island (UHI)") +
+  theme_bw() +
+  scale_x_continuous(breaks = seq(0, 2, by = 0.2),
+                     labels = seq(0, 2, by = 0.2)) +
+  scale_y_continuous(breaks = seq(6, 19, by = 4),
+                     labels = seq(6, 19, by = 4))
+```
+
+<br>
+
+#### Analysis
+
+For our analysis, we will use a generalized linear model with Poisson error distribution and a log link function, which is best suited for count data. We account for overdispersion by using a quasi-poisson regression.
+```{r}
+Result_glm <- glm(Diversiteit ~ UHI, family= quasipoisson(link = 'log'), data=Data)
+
+summary <- summary(Result_glm)
+summary
+```
+
+We extract the slope of the regression with 95% confidence interval and the p-value.
+```{r message=FALSE, warning=FALSE}
+summary$coefficients[2,1] ## Slope of the regression
+confint(Result_glm)[2,] ## Confidence interval for the regression slope
+summary$coefficients[2,4] ## Pr(>|t) for the regression slope
+```
+
+We plot Diversiteit along UHI, adding a regression slope with 95% confidence interval using the right glm model.
+
+```{r message=FALSE, warning=FALSE}
+ggplot(Data, aes(x = UHI, y = Diversiteit)) +
+  geom_point() +
+  geom_smooth(method=glm,  method.args=list(family = quasipoisson(link = 'log'))) +
+  labs(title = "Plant diversity along UHI",
+       y = expression("Amount of plant species" ~ ("m"^-2)),
+       x = "Urban Heat Island (UHI)") +
+  theme_bw() +
+  scale_x_continuous(breaks = seq(0, 2, by = 0.2),
+                     labels = seq(0, 2, by = 0.2)) +
+  scale_y_continuous(breaks = seq(6, 19, by = 4),
+                     labels = seq(6, 19, by = 4))
+```
+
+<br>
+
+### Conclusion
+
+We can conclude that there is no significant relationship at the 95% confidence level between the number of plant species per plot and intensity of the Urban Heat Island (slope and 95% CIs = -0.31 (-0.71 - 0.087, p = 0.154). However, our results do show a trend towards lower species richness with increasing UHI. This is what we would have expected if increasing temperatures do change the interactions between plant species from being facilitative to competitive. Future research can collect more data to find a significant result. We still cannot say, however, that there is a causal relationship between plant species richness and UHI, as we conducted an observational study and UHI was not directly manipulated. Other factors, like nitrogen emissions, water availability and other soil characteristics would likely also differ between different parts of the city of Utrecht and have an effect on the measured differences in plant diversity.
+
+<br>
+
+### References
+
+Brandsma, T., & Wolters, D. (2012). Measurement and Statistical Modeling of the Urban Heat Island of the City of Utrecht (the Netherlands). Journal of Applied Meteorology and Climatology, 51(6), 1046–1060. https://doi.org/10.1175/JAMC-D-11-0206.1
+
+Maaikaart. (03-2023). Retrieved 1 June 2023, from https://gu-geo.maps.arcgis.com/apps/webappviewer/index.html?id=7373671535e8426f8945113a9ee8e97d
+
+Olsen, S. L., Töpper, J. P., Skarpaas, O., Vandvik, V., & Klanderud, K. (2016). From facilitation to competition: Temperature-driven shift in dominant plant interactions affects population dynamics in seminatural grasslands. Global Change Biology, 22(5), 1915–1926. https://doi.org/10.1111/gcb.13241
+
+Rizwan, A. M., Dennis, L. Y. C., & Liu, C. (2008). A review on the generation, determination and mitigation of Urban Heat Island. Journal of Environmental Sciences, 20(1), 120–128. https://doi.org/10.1016/S1001-0742(08)60019-4
+
+
+
+
